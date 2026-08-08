@@ -151,7 +151,6 @@ fn normalize_profile(raw: &Value) -> Option<ProfileConfig> {
         template_id: parse_template(raw.get("templateId").and_then(|x| x.as_str())),
         keys,
         global_theme: parse_theme(raw.get("globalTheme").and_then(|x| x.as_str())),
-        show_kps_meter: bool_field(raw, "showKpsMeter", true),
         window_opacity: (num_field(raw, "windowOpacity", 1.0) as f32).clamp(0.1, 1.0),
         snap_to_grid: bool_field(raw, "snapToGrid", false),
         grid_size: (num_field(raw, "gridSize", DEFAULT_GRID as f64) as f32).clamp(2.0, 100.0),

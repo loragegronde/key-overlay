@@ -79,7 +79,6 @@ impl eframe::App for EditorApp {
         while let Ok(msg) = self.input_rx.try_recv() {
             self.state.handle_input(msg);
         }
-        self.state.tick_kps();
         self.state.autosave_tick();
         poll_global_actions(ctx, &mut self.state);
         show_editor(ctx, &mut self.state);

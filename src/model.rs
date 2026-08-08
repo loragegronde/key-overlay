@@ -128,7 +128,6 @@ pub struct ProfileConfig {
     pub template_id: LayoutTemplateId,
     pub keys: Vec<KeyConfig>,
     pub global_theme: VisualTheme,
-    pub show_kps_meter: bool,
     pub window_opacity: f32,
     pub snap_to_grid: bool,
     pub grid_size: f32,

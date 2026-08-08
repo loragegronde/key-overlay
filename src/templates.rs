@@ -142,11 +142,11 @@ fn template_keys(id: LayoutTemplateId) -> Vec<KeyConfig> {
             circle("KeyL", "HK", 440.0, 160.0, 64.0, Some("rgba(236,72,153,0.7)")),
         ],
         LayoutTemplateId::StreamerHud => {
-            let mut kps = key("KeyW", "KPS", 40.0, 40.0, 100.0, 48.0);
-            kps.style.show_press_count = true;
-            kps.style.background_color = "rgba(0,0,0,0.5)".into();
+            let mut hotkey = key("KeyW", "Hot", 40.0, 40.0, 100.0, 48.0);
+            hotkey.style.show_press_count = true;
+            hotkey.style.background_color = "rgba(0,0,0,0.5)".into();
             vec![
-                kps,
+                hotkey,
                 key("KeyM", "Mic", 160.0, 40.0, 64.0, 48.0),
                 key("KeyC", "Cam", 240.0, 40.0, 64.0, 48.0),
                 key("F1", "Scene", 320.0, 40.0, 72.0, 48.0),
@@ -264,7 +264,6 @@ pub fn create_profile_from_template(id: LayoutTemplateId, name: Option<String>) 
         template_id: id,
         keys,
         global_theme: VisualTheme::Cyberpunk,
-        show_kps_meter: true,
         window_opacity: 1.0,
         snap_to_grid: false,
         grid_size: DEFAULT_GRID_SIZE,

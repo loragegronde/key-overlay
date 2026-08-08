@@ -10,7 +10,8 @@ Pure **Rust** desktop app (`eframe` / `egui`) — single native binary, no web s
 - Transparent always-on-top HUD (`--overlay` process, glow renderer) with click-through lock
 - Multi-layout library (create / duplicate / rename / switch)
 - Keyboard + mouse capture (`rdev`) and gamepad sticks/buttons (`gilrs`)
-- Themes, press effects, KPS meter, target-app visibility filter
+- Themes, press effects, target-app visibility filter
+- Content-sized HUD window you can drag anywhere on screen
 - Persists to `layout.json` (v4 library schema)
 
 ## Hotkeys

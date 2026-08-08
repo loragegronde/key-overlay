@@ -26,8 +26,6 @@ pub struct AppState {
     pub suppress_shortcuts_until: Instant,
     pub drawer: Option<DrawerTab>,
     pub style_scope_all: bool,
-    pub kps_history: Vec<Instant>,
-    pub kps: usize,
     pub dirty: bool,
     pub last_save: Instant,
     pub status: Option<(String, Instant)>,
@@ -74,8 +72,6 @@ impl AppState {
             suppress_shortcuts_until: Instant::now(),
             drawer: Some(DrawerTab::Layouts),
             style_scope_all: true,
-            kps_history: Vec::new(),
-            kps: 0,
             dirty: false,
             last_save: Instant::now(),
             status: None,
@@ -234,23 +230,10 @@ impl AppState {
                     }
                     self.active_keys.insert(code.clone());
                     *self.press_counts.entry(code).or_insert(0) += 1;
-                    let now = Instant::now();
-                    self.kps_history.retain(|t| now.duration_since(*t) < Duration::from_secs(1));
-                    self.kps_history.push(now);
-                    self.kps = self.kps_history.len();
                 } else {
                     self.active_keys.remove(&code);
                 }
             }
-        }
-    }
-
-    pub fn tick_kps(&mut self) {
-        let now = Instant::now();
-        let before = self.kps_history.len();
-        self.kps_history.retain(|t| now.duration_since(*t) < Duration::from_secs(1));
-        if self.kps_history.len() != before {
-            self.kps = self.kps_history.len();
         }
     }
 
@@ -341,7 +324,6 @@ impl AppState {
         self.push_history();
         let keep_id = self.profile().id.clone();
         let keep_created = self.profile().created_at.clone();
-        let show_kps = self.profile().show_kps_meter;
         let opacity = self.profile().window_opacity;
         let snap = self.profile().snap_to_grid;
         let grid = self.profile().grid_size;
@@ -351,7 +333,6 @@ impl AppState {
         let mut next = create_profile_from_template(id, None);
         next.id = keep_id;
         next.created_at = keep_created;
-        next.show_kps_meter = show_kps;
         next.window_opacity = opacity;
         next.snap_to_grid = snap;
         next.grid_size = grid;

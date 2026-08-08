@@ -87,15 +87,6 @@ fn toolbar(ui: &mut Ui, state: &mut AppState) {
         state.place_overlay();
     }
 
-    if state.profile().show_kps_meter {
-        ui.add_space(6.0);
-        ui.label(
-            RichText::new(format!("{} KPS", state.kps))
-                .monospace()
-                .color(Color32::from_rgb(34, 211, 238)),
-        );
-    }
-
     ui.separator();
     if ui.button("Add Custom Key").clicked() {
         state.add_key();
@@ -483,11 +474,6 @@ fn layouts_tab(ui: &mut Ui, state: &mut AppState) {
 }
 
 fn settings_tab(ui: &mut Ui, state: &mut AppState) {
-    let mut show_kps = state.profile().show_kps_meter;
-    if ui.checkbox(&mut show_kps, "Show KPS meter").changed() {
-        state.profile_mut().show_kps_meter = show_kps;
-        state.dirty = true;
-    }
     let mut opacity = state.profile().window_opacity;
     if ui
         .add(Slider::new(&mut opacity, 0.1..=1.0).text("Overlay opacity"))
@@ -582,8 +568,9 @@ fn canvas(ui: &mut Ui, state: &mut AppState) {
         .fill(Color32::from_rgb(6, 10, 18))
         .stroke(Stroke::new(1.0_f32, Color32::from_white_alpha(10)))
         .show(ui, |ui| {
-            let (response, painter) =
-                ui.allocate_painter(ui.available_size(), Sense::click_and_drag());
+            // Hover-only: geometric hit-testing owns select/drag (egui clicked/drag_started
+            // fire on later frames and never matched primary_pressed).
+            let (response, painter) = ui.allocate_painter(ui.available_size(), Sense::hover());
             state.canvas_size = response.rect.size();
 
             if state.profile().snap_to_grid {
@@ -625,17 +612,15 @@ fn canvas(ui: &mut Ui, state: &mut AppState) {
             // Shift origin so keys are in canvas-local coords.
             let origin = response.rect.min;
             let keys = state.profile().keys.clone();
-            let mut hit_id = None;
             let mut resize_hit: Option<(String, ResizeHandle)> = None;
 
             ui.allocate_new_ui(egui::UiBuilder::new().max_rect(response.rect), |ui| {
                 ui.set_clip_rect(response.rect);
-                // Translate painting into canvas space by modifying key positions temporarily.
                 for key in &keys {
                     let mut k = key.clone();
                     k.x += origin.x;
                     k.y += origin.y;
-                    let resp = paint_key(ui, state, &k, true);
+                    let _ = paint_key(ui, state, &k, true);
                     if state.selected.contains(&key.id) {
                         paint_resize_handles(ui, key_rect(&k));
                         let r = key_rect(&k);
@@ -654,33 +639,46 @@ fn canvas(ui: &mut Ui, state: &mut AppState) {
                             }
                         }
                     }
-                    if resp.clicked() || resp.drag_started() {
-                        hit_id = Some(key.id.clone());
-                    }
                 }
             });
 
             let pointer = ui.input(|i| i.pointer.interact_pos());
-            let primary_down = ui.input(|i| i.pointer.primary_pressed());
+            let primary_pressed = ui.input(|i| i.pointer.primary_pressed());
+            let primary_down = ui.input(|i| i.pointer.primary_down());
             let primary_released = ui.input(|i| i.pointer.primary_released());
-            let dragging = ui.input(|i| i.pointer.is_decidedly_dragging());
             let shift = ui.input(|i| i.modifiers.shift);
 
-            if primary_down {
+            // Hit-test on the press frame (pointer-in-rect), topmost key wins.
+            let mut hit_id = None;
+            if let Some(pos) = pointer {
+                if response.rect.contains(pos) {
+                    for key in keys.iter().rev() {
+                        let mut k = key.clone();
+                        k.x += origin.x;
+                        k.y += origin.y;
+                        if key_rect(&k).contains(pos) {
+                            hit_id = Some(key.id.clone());
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if primary_pressed {
                 if let Some((id, handle)) = resize_hit.clone() {
-                    let origin = state
+                    let key_origin = state
                         .profile()
                         .keys
                         .iter()
                         .find(|k| k.id == id)
                         .map(key_rect);
-                    if let Some(origin) = origin {
+                    if let Some(key_origin) = key_origin {
                         state.push_history();
                         state.drag = Some(DragSession::Resize {
                             id,
                             handle,
                             start: pointer.unwrap_or_default(),
-                            origin,
+                            origin: key_origin,
                         });
                     }
                 } else if let Some(id) = hit_id {
@@ -688,10 +686,10 @@ fn canvas(ui: &mut Ui, state: &mut AppState) {
                         if state.selected.contains(&id) {
                             state.selected.remove(&id);
                         } else {
-                            state.selected.insert(id);
+                            state.selected.insert(id.clone());
                         }
                     } else if !state.selected.contains(&id) {
-                        state.selected = std::collections::HashSet::from([id]);
+                        state.selected = std::collections::HashSet::from([id.clone()]);
                     }
                     let origins = state
                         .profile()
@@ -705,13 +703,13 @@ fn canvas(ui: &mut Ui, state: &mut AppState) {
                         start: pointer.unwrap_or_default(),
                         origins,
                     });
-                } else {
+                } else if pointer.is_some_and(|p| response.rect.contains(p)) {
                     state.selected.clear();
                     state.drag = None;
                 }
             }
 
-            if dragging {
+            if primary_down {
                 if let (Some(pos), Some(session)) = (pointer, state.drag.as_ref()) {
                     match session {
                         DragSession::Move { start, origins } => {
@@ -724,7 +722,8 @@ fn canvas(ui: &mut Ui, state: &mut AppState) {
                             }
                             let origins = origins.clone();
                             for (id, origin) in origins {
-                                if let Some(k) = state.profile_mut().keys.iter_mut().find(|k| k.id == id)
+                                if let Some(k) =
+                                    state.profile_mut().keys.iter_mut().find(|k| k.id == id)
                                 {
                                     k.x = (origin.x + dx).max(0.0);
                                     k.y = (origin.y + dy).max(0.0);
@@ -742,7 +741,9 @@ fn canvas(ui: &mut Ui, state: &mut AppState) {
                             let id = id.clone();
                             let handle = *handle;
                             let origin = *origin;
-                            if let Some(k) = state.profile_mut().keys.iter_mut().find(|k| k.id == id) {
+                            if let Some(k) =
+                                state.profile_mut().keys.iter_mut().find(|k| k.id == id)
+                            {
                                 let mut x = origin.min.x;
                                 let mut y = origin.min.y;
                                 let mut w = origin.width();
@@ -769,10 +770,11 @@ fn canvas(ui: &mut Ui, state: &mut AppState) {
                                         y = origin.max.y - h;
                                     }
                                 }
-                                k.x = x;
-                                k.y = y;
-                                k.width = w;
-                                k.height = h;
+                                let scale = k.scale.max(0.01);
+                                k.x = x.max(0.0);
+                                k.y = y.max(0.0);
+                                k.width = w / scale;
+                                k.height = h / scale;
                             }
                         }
                     }
