@@ -164,7 +164,7 @@ fn toolbar(ui: &mut Ui, state: &mut AppState) {
     ui.with_layout(Layout::bottom_up(Align::LEFT), |ui| {
         ui.label(
             RichText::new(format!(
-                "Ctrl+Z undo · {HOTKEY_TOGGLE_LOCK} lock · {HOTKEY_TOGGLE_VISIBILITY} hide · {HOTKEY_OPEN_EDITOR} editor"
+                "Ctrl+Z undo · {HOTKEY_TOGGLE_LOCK} lock/unlock · {HOTKEY_TOGGLE_VISIBILITY} hide · {HOTKEY_OPEN_EDITOR} editor"
             ))
             .small()
             .color(Color32::DARK_GRAY),
@@ -556,7 +556,7 @@ fn settings_tab(ui: &mut Ui, state: &mut AppState) {
     ui.separator();
     ui.label(
         RichText::new(format!(
-            "Hotkeys: {HOTKEY_TOGGLE_VISIBILITY} visibility · {HOTKEY_TOGGLE_LOCK} lock"
+            "Hotkeys: {HOTKEY_TOGGLE_VISIBILITY} visibility · {HOTKEY_TOGGLE_LOCK} lock/unlock"
         ))
         .small()
         .color(Color32::GRAY),
