@@ -2,7 +2,7 @@
 
 Lightweight **keyboard / mouse / controller overlay** for streamers and speedrunners.
 
-Pure **Rust** desktop app (`eframe` / `egui`) — no Tauri, no WebView, no Node in production.
+Pure **Rust** desktop app (`eframe` / `egui`) — single native binary, no web stack.
 
 ## Features
 
@@ -49,7 +49,7 @@ Saved under:
 - Windows: `%APPDATA%\com.keyoverlay.app\layout.json`
 - Linux: `~/.config/key-overlay/layout.json` (via `directories`)
 
-Existing v1–v3 single profiles and v4 libraries from the previous Tauri build are migrated on load.
+Existing v1–v3 single profiles and v4 libraries are migrated on load.
 
 ## Place overlay
 

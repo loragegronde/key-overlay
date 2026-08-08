@@ -15,7 +15,8 @@ use crate::templates::{create_default_library, create_profile_from_template, def
 pub fn layout_path() -> PathBuf {
     let dirs = ProjectDirs::from("com", "keyoverlay", "key-overlay")
         .or_else(|| ProjectDirs::from("com", "keyoverlay", "app"));
-    // Prefer the historical Tauri identifier path when possible.
+    // Keep the historical Windows config folder so existing layout.json files
+    // continue to load after upgrades.
     if let Some(base) = std::env::var_os("APPDATA") {
         let legacy = PathBuf::from(base)
             .join("com.keyoverlay.app")
@@ -23,7 +24,6 @@ pub fn layout_path() -> PathBuf {
         if legacy.exists() {
             return legacy;
         }
-        // Still write/read under the same historical folder on Windows.
         return PathBuf::from(
             std::env::var_os("APPDATA").expect("APPDATA checked above"),
         )
