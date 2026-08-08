@@ -10,7 +10,7 @@ mod templates;
 mod ui;
 
 use std::sync::mpsc::Receiver;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use eframe::egui;
 
