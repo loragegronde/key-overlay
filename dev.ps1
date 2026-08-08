@@ -23,8 +23,24 @@ function Import-VcVars {
     return $true
 }
 
+function Stop-KeyOverlay {
+    # Windows locks running .exe files — cargo cannot overwrite key-overlay.exe
+    # while the editor/HUD is still open (common after detached -Run).
+    $procs = Get-Process -Name "key-overlay" -ErrorAction SilentlyContinue
+    if (-not $procs) { return }
+    Write-Host "Stopping running key-overlay process(es) so the build can replace the .exe..."
+    $procs | Stop-Process -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 400
+    $left = Get-Process -Name "key-overlay" -ErrorAction SilentlyContinue
+    if ($left) {
+        Write-Error "Could not stop key-overlay.exe. Close the app (and HUD) manually, then rebuild."
+        exit 1
+    }
+}
+
 if ($IsWindows -or $env:OS -match "Windows") {
     [void](Import-VcVars)
+    Stop-KeyOverlay
 }
 
 $buildArgs = @("build")

@@ -36,6 +36,12 @@ Pure **Rust** desktop app (`eframe` / `egui`) — single native binary, no web s
 
 You can also double-click `target\release\key-overlay.exe`.
 
+Before building, `dev.ps1` stops any running `key-overlay` processes so Cargo can replace the `.exe`. If you build with plain `cargo build` and see `failed to remove file ... key-overlay.exe`, close the app or run:
+
+```powershell
+Stop-Process -Name key-overlay -Force -ErrorAction SilentlyContinue
+```
+
 `dev.ps1` loads the MSVC toolchain (`vcvars64`) before calling Cargo.
 
 ### Linux / macOS
