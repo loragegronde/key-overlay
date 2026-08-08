@@ -626,7 +626,7 @@ fn canvas(ui: &mut Ui, state: &mut AppState) {
             let mut hit_id = None;
             let mut resize_hit: Option<(String, ResizeHandle)> = None;
 
-            ui.allocate_ui_at_rect(response.rect, |ui| {
+            ui.allocate_new_ui(egui::UiBuilder::new().max_rect(response.rect), |ui| {
                 ui.set_clip_rect(response.rect);
                 // Translate painting into canvas space by modifying key positions temporarily.
                 for key in &keys {

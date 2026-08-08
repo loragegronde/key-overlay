@@ -195,7 +195,9 @@ mod windows_impl {
         unsafe {
             // Best-effort: find our overlay window by title.
             let title: Vec<u16> = "Key Overlay HUD\0".encode_utf16().collect();
-            let hwnd = FindWindowW(None, windows::core::PCWSTR(title.as_ptr()));
+            let Ok(hwnd) = FindWindowW(None, windows::core::PCWSTR(title.as_ptr())) else {
+                return;
+            };
             if hwnd.0.is_null() {
                 return;
             }
@@ -207,8 +209,6 @@ mod windows_impl {
                 style &= !(WS_EX_TRANSPARENT.0 as i32);
             }
             SetWindowLongW(hwnd, GWL_EXSTYLE, style);
-            let _ = hwnd;
-            let _ = HWND::default();
         }
     }
 }

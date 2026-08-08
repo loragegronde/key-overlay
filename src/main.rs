@@ -198,7 +198,6 @@ impl WindowsShell {
             let tray = tray_icon::TrayIconBuilder::new()
                 .with_tooltip("Key Overlay")
                 .with_icon(icon)
-                .with_menu(&tray_icon::menu::Menu::new())
                 .build();
             let _ = tray;
         }
