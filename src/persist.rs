@@ -36,6 +36,10 @@ pub fn layout_path() -> PathBuf {
     PathBuf::from("layout.json")
 }
 
+pub fn layout_mtime() -> Option<std::time::SystemTime> {
+    fs::metadata(layout_path()).and_then(|m| m.modified()).ok()
+}
+
 pub fn load_library() -> LayoutLibrary {
     let path = layout_path();
     match fs::read_to_string(&path) {

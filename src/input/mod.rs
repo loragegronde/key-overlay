@@ -9,7 +9,6 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use gilrs::{Axis, Button, Gilrs};
 use once_cell::sync::Lazy;
@@ -29,7 +28,6 @@ pub enum InputMsg {
         code: String,
         label: String,
         action: InputAction,
-        timestamp: u64,
     },
     StickAxes {
         code: String,
@@ -76,12 +74,6 @@ pub fn start_listener() -> Receiver<InputMsg> {
     rx
 }
 
-fn now_ms() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_millis() as u64)
-        .unwrap_or(0)
-}
 
 fn translate_rdev(event: rdev::Event) -> Option<InputMsg> {
     use rdev::EventType;
@@ -100,7 +92,6 @@ fn translate_rdev(event: rdev::Event) -> Option<InputMsg> {
         code: code.into_owned(),
         label: label.into_owned(),
         action,
-        timestamp: now_ms(),
     })
 }
 
@@ -133,7 +124,6 @@ fn gamepad_loop(tx: Sender<InputMsg>) {
                         code: (*code).into(),
                         label: (*label).into(),
                         action,
-                        timestamp: now_ms(),
                     });
                 }
                 prev_buttons.insert(key, pressed);
@@ -171,7 +161,6 @@ fn gamepad_loop(tx: Sender<InputMsg>) {
                         } else {
                             InputAction::Up
                         },
-                        timestamp: now_ms(),
                     });
                 }
                 prev_stick.insert(key, active);
@@ -202,7 +191,6 @@ fn gamepad_loop(tx: Sender<InputMsg>) {
                             } else {
                                 InputAction::Up
                             },
-                            timestamp: now_ms(),
                         });
                     }
                     prev_dirs.insert(key, active);

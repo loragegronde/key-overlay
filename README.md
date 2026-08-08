@@ -19,7 +19,7 @@ Pure **Rust** desktop app (`eframe` / `egui`) — single native binary, no web s
 | Shortcut | Action |
 | --- | --- |
 | `Ctrl+Shift+O` | Show / hide overlay |
-| `Ctrl+Shift+L` | Lock overlay (click-through) after placing |
+| `Ctrl+Shift+L` | Lock / unlock overlay (click-through) |
 | `Ctrl+Shift+E` | Focus editor (Windows) |
 | `Ctrl+Z` / `Ctrl+Y` | Undo / redo in the editor |
 

@@ -139,10 +139,10 @@ pub fn key_label(key: Key) -> Cow<'static, str> {
             }
         }
         Key::CapsLock => "Caps",
-        Key::UpArrow => "↑",
-        Key::DownArrow => "↓",
-        Key::LeftArrow => "←",
-        Key::RightArrow => "→",
+        Key::UpArrow => "▲",
+        Key::DownArrow => "▼",
+        Key::LeftArrow => "◀",
+        Key::RightArrow => "▶",
         _ => return key_code(key),
     };
     Cow::Borrowed(label)

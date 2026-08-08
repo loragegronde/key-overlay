@@ -197,7 +197,6 @@ impl AppState {
                 code,
                 label,
                 action,
-                ..
             } => {
                 if action == InputAction::Down {
                     if let Some(id) = self.capturing.clone() {
@@ -541,6 +540,7 @@ impl AppState {
 
     pub fn place_overlay(&mut self) {
         self.flush_save();
+        crate::hud_control::reset_for_place();
         platform::set_overlay_live(true);
         platform::set_manual_visible(true);
         platform::set_positioning(true);
@@ -555,7 +555,7 @@ impl AppState {
             Ok(exe) => match std::process::Command::new(exe).arg("--overlay").spawn() {
                 Ok(_) => {
                     self.overlay_open = true;
-                    self.flash("Overlay launched — drag it, then Ctrl+Shift+L to lock");
+                    self.flash("Overlay launched — drag it, then Ctrl+Shift+L to lock/unlock");
                 }
                 Err(err) => self.flash(format!("could not launch overlay: {err}")),
             },

@@ -1,6 +1,7 @@
 //! Key Overlay — lightweight pure-Rust editor + transparent HUD.
 
 mod color;
+mod hud_control;
 mod input;
 mod model;
 mod persist;
@@ -96,11 +97,21 @@ fn poll_global_actions(ctx: &egui::Context, state: &mut AppState) {
         while let Some(action) = WindowsShell::poll() {
             match action {
                 ShellAction::ToggleVisibility => {
-                    platform::toggle_manual_visible();
+                    let ctrl = hud_control::toggle_visible();
+                    platform::set_manual_visible(ctrl.visible);
+                    state.flash(if ctrl.visible {
+                        "Overlay shown"
+                    } else {
+                        "Overlay hidden"
+                    });
                 }
-                ShellAction::LockOverlay => {
-                    platform::finish_positioning();
-                    state.flash("Overlay locked (click-through)");
+                ShellAction::ToggleLock => {
+                    let ctrl = hud_control::toggle_lock();
+                    state.flash(if ctrl.locked {
+                        "Overlay locked (click-through)"
+                    } else {
+                        "Overlay unlocked — drag to reposition"
+                    });
                 }
                 ShellAction::FocusEditor => {
                     state.editor_request_focus = true;
@@ -112,11 +123,21 @@ fn poll_global_actions(ctx: &egui::Context, state: &mut AppState) {
     ctx.input(|i| {
         let chord = i.modifiers.ctrl && i.modifiers.shift;
         if chord && i.key_pressed(egui::Key::O) {
-            platform::toggle_manual_visible();
+            let ctrl = hud_control::toggle_visible();
+            platform::set_manual_visible(ctrl.visible);
+            state.flash(if ctrl.visible {
+                "Overlay shown"
+            } else {
+                "Overlay hidden"
+            });
         }
         if chord && i.key_pressed(egui::Key::L) {
-            platform::finish_positioning();
-            state.flash("Overlay locked (click-through)");
+            let ctrl = hud_control::toggle_lock();
+            state.flash(if ctrl.locked {
+                "Overlay locked (click-through)"
+            } else {
+                "Overlay unlocked — drag to reposition"
+            });
         }
         if chord && i.key_pressed(egui::Key::E) {
             state.editor_request_focus = true;
@@ -132,7 +153,7 @@ fn poll_global_actions(ctx: &egui::Context, state: &mut AppState) {
 #[cfg(windows)]
 enum ShellAction {
     ToggleVisibility,
-    LockOverlay,
+    ToggleLock,
     FocusEditor,
 }
 
@@ -186,7 +207,7 @@ impl WindowsShell {
                 return Some(ShellAction::ToggleVisibility);
             }
             if ev.id == ids.lock {
-                return Some(ShellAction::LockOverlay);
+                return Some(ShellAction::ToggleLock);
             }
             if ev.id == ids.editor {
                 return Some(ShellAction::FocusEditor);

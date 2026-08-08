@@ -102,12 +102,6 @@ fn from_hex(c: u8) -> Option<u8> {
     }
 }
 
-pub fn with_alpha(input: &str, alpha: f32) -> String {
-    let mut c = parse_color(input);
-    c.a = clamp01(alpha);
-    c.to_css()
-}
-
 /// Opaque pressed fill: blend glow into background without dropping alpha.
 pub fn pressed_fill(background: &str, glow: &str, amount: f32) -> Rgba {
     let base = parse_color(background);

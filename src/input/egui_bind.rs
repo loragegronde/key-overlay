@@ -55,7 +55,6 @@ pub fn capture_from_egui(ctx: &egui::Context, state: &mut AppState) {
             code,
             label,
             action: InputAction::Down,
-            timestamp: 0,
         });
     }
 }
@@ -103,10 +102,10 @@ fn map_egui_key(key: Key) -> Option<(String, String)> {
         Key::Tab => ("Tab", "Tab"),
         Key::Backspace => ("Backspace", "⌫"),
         Key::Delete => ("Delete", "Del"),
-        Key::ArrowUp => ("ArrowUp", "↑"),
-        Key::ArrowDown => ("ArrowDown", "↓"),
-        Key::ArrowLeft => ("ArrowLeft", "←"),
-        Key::ArrowRight => ("ArrowRight", "→"),
+        Key::ArrowUp => ("ArrowUp", "▲"),
+        Key::ArrowDown => ("ArrowDown", "▼"),
+        Key::ArrowLeft => ("ArrowLeft", "◀"),
+        Key::ArrowRight => ("ArrowRight", "▶"),
         Key::Home => ("Home", "Home"),
         Key::End => ("End", "End"),
         Key::PageUp => ("PageUp", "PgUp"),

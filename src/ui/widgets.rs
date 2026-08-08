@@ -112,11 +112,12 @@ pub fn paint_key(
             );
         }
     } else if key.style.show_label {
-        let mut label = if capturing {
-            "…".to_string()
+        let base = if capturing {
+            "…"
         } else {
-            key.label.clone()
+            display_label(key)
         };
+        let mut label = base.to_string();
         if key.style.show_press_count {
             if let Some(n) = state.press_counts.get(&key.code) {
                 if *n > 0 {
@@ -124,11 +125,17 @@ pub fn paint_key(
                 }
             }
         }
+        // Proportional font: arrow / symbol labels render poorly in monospace.
+        let font = if is_symbol_label(base) {
+            FontId::proportional(key.style.font_size)
+        } else {
+            FontId::monospace(key.style.font_size)
+        };
         painter.text(
             draw_rect.center(),
             Align2::CENTER_CENTER,
             label,
-            FontId::monospace(key.style.font_size),
+            font,
             parse_color(&key.style.text_color).to_egui(),
         );
     }
@@ -141,6 +148,28 @@ pub fn paint_key(
     }
 
     response
+}
+
+/// Reliable labels for keys whose unicode arrows often missing from UI fonts.
+fn display_label(key: &KeyConfig) -> &str {
+    match key.code.as_str() {
+        "ArrowUp" => "▲",
+        "ArrowDown" => "▼",
+        "ArrowLeft" => "◀",
+        "ArrowRight" => "▶",
+        _ => match key.label.as_str() {
+            "↑" | "⬆" => "▲",
+            "↓" | "⬇" => "▼",
+            "←" | "⬅" => "◀",
+            "→" | "➡" => "▶",
+            _ => key.label.as_str(),
+        },
+    }
+}
+
+fn is_symbol_label(label: &str) -> bool {
+    matches!(label, "▲" | "▼" | "◀" | "▶" | "…" | "↑" | "↓" | "←" | "→")
+        || label.chars().any(|c| !c.is_ascii_alphanumeric() && c != ' ')
 }
 
 pub fn paint_resize_handles(ui: &mut Ui, rect: Rect) {

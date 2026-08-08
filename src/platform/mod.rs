@@ -33,13 +33,6 @@ pub fn set_manual_visible(visible: bool) {
     recompute();
 }
 
-pub fn toggle_manual_visible() -> bool {
-    let next = !MANUAL_VISIBLE.load(Ordering::SeqCst);
-    MANUAL_VISIBLE.store(next, Ordering::SeqCst);
-    recompute();
-    next
-}
-
 #[allow(dead_code)]
 pub fn is_manual_visible() -> bool {
     MANUAL_VISIBLE.load(Ordering::SeqCst)
@@ -60,6 +53,7 @@ pub fn set_positioning(enabled: bool) {
     }
 }
 
+#[cfg_attr(not(windows), allow(dead_code))]
 pub fn is_positioning() -> bool {
     POSITIONING.load(Ordering::SeqCst)
 }
@@ -68,6 +62,7 @@ pub fn set_click_through(enabled: bool) {
     CLICK_THROUGH.store(enabled, Ordering::SeqCst);
 }
 
+#[cfg_attr(not(windows), allow(dead_code))]
 pub fn is_click_through() -> bool {
     CLICK_THROUGH.load(Ordering::SeqCst)
 }
@@ -138,7 +133,7 @@ mod windows_impl {
     use std::os::windows::ffi::OsStringExt;
 
     use windows::core::PWSTR;
-    use windows::Win32::Foundation::{CloseHandle, HWND, MAX_PATH};
+    use windows::Win32::Foundation::{CloseHandle, MAX_PATH};
     use windows::Win32::System::Threading::{
         OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION,
     };
