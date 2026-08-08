@@ -38,7 +38,6 @@ pub struct OverlayApp {
     control: HudControl,
     last_native_flags: Instant,
     flags_dirty: bool,
-    last_show: Option<bool>,
     last_passthrough: Option<bool>,
     /// Top-left of content in layout coordinates (keys drawn relative to this).
     content_origin: Pos2,
@@ -72,7 +71,6 @@ impl OverlayApp {
             control,
             last_native_flags: Instant::now(),
             flags_dirty: true,
-            last_show: None,
             last_passthrough: None,
             content_origin: origin,
             last_size: size,
@@ -167,23 +165,25 @@ impl eframe::App for OverlayApp {
 
         self.sync_control();
         self.sync_layout();
+        // Fresh foreground check every frame (watcher is a backup).
+        platform::recompute();
         self.sync_window_size(ctx);
 
-        // Unlocked (positioning): always show so you can place the HUD.
-        // Locked: honor target-app filter + manual visibility.
+        // Keep the OS window always mapped. Hiding via Visible(false) can stop
+        // egui's update loop on Windows, so a filtered-out HUD never reappears.
+        ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
+
+        // Unlocked: always paint so you can place the HUD.
+        // Locked: honor target-app filter + manual visibility from hud-control.
         let positioning = !self.control.locked;
-        let filtered =
-            platform::SHOULD_SHOW_OVERLAY.load(std::sync::atomic::Ordering::SeqCst);
-        let show = self.control.visible && (positioning || filtered);
+        let filtered = platform::content_should_show();
+        let show_content = self.control.visible && (positioning || filtered);
 
-        if self.last_show != Some(show) {
-            ctx.send_viewport_cmd(egui::ViewportCommand::Visible(show));
-            self.last_show = Some(show);
-        }
-
-        let passthrough = self.control.locked;
+        // Click-through whenever content is hidden or locked.
+        let passthrough = !show_content || self.control.locked;
         if self.last_passthrough != Some(passthrough) {
             ctx.send_viewport_cmd(egui::ViewportCommand::MousePassthrough(passthrough));
+            platform::set_click_through(passthrough && !positioning);
             self.last_passthrough = Some(passthrough);
             self.flags_dirty = true;
         }
@@ -200,8 +200,14 @@ impl eframe::App for OverlayApp {
         CentralPanel::default()
             .frame(Frame::none().fill(Color32::TRANSPARENT))
             .show(ctx, |ui| {
-                ui.set_opacity(opacity);
                 let full = ui.max_rect();
+
+                if !show_content {
+                    // Fully empty transparent window — filter miss / manual hide.
+                    return;
+                }
+
+                ui.set_opacity(opacity);
 
                 if positioning {
                     let drag = ui.interact(full, ui.id().with("overlay-drag"), Sense::drag());
@@ -229,9 +235,9 @@ impl eframe::App for OverlayApp {
             std::process::exit(0);
         }
 
-        // Repaint quickly while keys are held; idle a bit slower to cut CPU.
-        let busy = !self.state.active_keys.is_empty() || positioning;
-        ctx.request_repaint_after(Duration::from_millis(if busy { 8 } else { 33 }));
+        // Keep polling foreground apps even when content is hidden.
+        let busy = !self.state.active_keys.is_empty() || positioning || platform::filter_enabled();
+        ctx.request_repaint_after(Duration::from_millis(if busy { 16 } else { 50 }));
     }
 }
 

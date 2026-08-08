@@ -576,8 +576,39 @@ fn settings_tab(ui: &mut Ui, state: &mut AppState) {
             platform::set_filter(true, name.clone());
             state.dirty = true;
             state.flush_save();
-            state.flash(format!("Filter set to \"{name}\""));
+            state.flash(format!("Filter set to \"{name}\" — lock HUD, then focus that app"));
         }
+    }
+
+    if state.profile().target_app_enabled {
+        let probe = if live.is_own_app() {
+            external.clone()
+        } else {
+            live
+        };
+        let needle = platform::normalize_match_token(&state.profile().target_app_match);
+        let process = platform::normalize_match_token(&probe.process_name);
+        let title = probe.window_title.to_lowercase();
+        let matches = !needle.is_empty()
+            && ((!process.is_empty() && (process.contains(&needle) || needle.contains(&process)))
+                || title.contains(&needle));
+        ui.label(
+            RichText::new(if matches {
+                "Status: HUD will show for this app (when locked)"
+            } else if needle.is_empty() {
+                "Status: enter a match string or Capture an app"
+            } else if probe.process_name.is_empty() && probe.window_title.is_empty() {
+                "Status: focus your game once so we can detect it"
+            } else {
+                "Status: HUD hidden for this app — focus the matched app"
+            })
+            .small()
+            .color(if matches {
+                Color32::from_rgb(74, 222, 128)
+            } else {
+                Color32::from_rgb(251, 191, 36)
+            }),
+        );
     }
 
     ui.separator();

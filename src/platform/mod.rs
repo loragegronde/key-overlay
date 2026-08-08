@@ -15,8 +15,9 @@ static CLICK_THROUGH: AtomicBool = AtomicBool::new(false);
 static FILTER_MATCH: Lazy<Mutex<String>> = Lazy::new(|| Mutex::new(String::new()));
 static WATCHER: AtomicBool = AtomicBool::new(false);
 /// Last non–Key-Overlay foreground app (for capture + stable filter while we are focused).
-static LAST_EXTERNAL: Lazy<Mutex<ForegroundApp>> = Lazy::new(|| Mutex::new(ForegroundApp::default()));
-/// Shared flag for UI: whether overlay viewport should be shown.
+static LAST_EXTERNAL: Lazy<Mutex<ForegroundApp>> =
+    Lazy::new(|| Mutex::new(ForegroundApp::default()));
+/// Shared flag for UI: whether overlay content should be shown.
 pub static SHOULD_SHOW_OVERLAY: AtomicBool = AtomicBool::new(true);
 
 #[derive(Debug, Clone, Default)]
@@ -69,6 +70,10 @@ pub fn set_filter(enabled: bool, match_text: String) {
     recompute();
 }
 
+pub fn filter_enabled() -> bool {
+    FILTER_ENABLED.load(Ordering::SeqCst)
+}
+
 pub fn set_positioning(enabled: bool) {
     POSITIONING.store(enabled, Ordering::SeqCst);
     if enabled {
@@ -109,25 +114,41 @@ fn filter_allows(fg: &ForegroundApp) -> bool {
     if !FILTER_ENABLED.load(Ordering::SeqCst) {
         return true;
     }
-    let needle = FILTER_MATCH
+    let raw = FILTER_MATCH
         .lock()
-        .map(|g| normalize_match_token(&g))
+        .map(|g| g.clone())
         .unwrap_or_default();
+    let needle = normalize_match_token(&raw);
     if needle.is_empty() {
         return true;
     }
     let process = normalize_match_token(&fg.process_name);
     let title = fg.window_title.to_lowercase();
-    process.contains(&needle)
-        || title.contains(&needle)
-        || needle.contains(&process) && !process.is_empty()
+
+    // Substring either way so "Discord" matches "discord", "Discord.exe", titles, etc.
+    if !process.is_empty() && (process.contains(&needle) || needle.contains(&process)) {
+        return true;
+    }
+    if title.contains(&needle) {
+        return true;
+    }
+    // Also try raw (un-normalized) title contains for multi-word titles.
+    if !raw.trim().is_empty() && title.contains(&raw.trim().to_lowercase()) {
+        return true;
+    }
+    false
+}
+
+/// Whether the HUD content should be painted for the current foreground app.
+pub fn content_should_show() -> bool {
+    SHOULD_SHOW_OVERLAY.load(Ordering::SeqCst)
 }
 
 pub fn recompute() {
     let fg = get_foreground_app().unwrap_or_default();
 
     // While Key Overlay / HUD is focused, keep the last visibility decision so
-    // enabling the filter from Settings does not immediately hide the HUD.
+    // editing Settings does not blank the HUD.
     if fg.is_own_app() {
         return;
     }
@@ -147,7 +168,7 @@ pub fn start_watcher() {
         return;
     }
     thread::spawn(|| loop {
-        thread::sleep(Duration::from_millis(200));
+        thread::sleep(Duration::from_millis(150));
         recompute();
     });
 }
@@ -165,7 +186,6 @@ pub fn get_foreground_app() -> Result<ForegroundApp, String> {
 
 /// Last focused app that was not Key Overlay (best target for “use this app”).
 pub fn last_external_app() -> ForegroundApp {
-    // Refresh once so a freshly focused game is picked up before the button click.
     let _ = recompute_external_only();
     LAST_EXTERNAL
         .lock()
@@ -237,8 +257,12 @@ mod windows_impl {
         let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
         let mut buf = [0u16; MAX_PATH as usize];
         let mut size = buf.len() as u32;
-        let ok =
-            QueryFullProcessImageNameW(handle, Default::default(), PWSTR(buf.as_mut_ptr()), &mut size);
+        let ok = QueryFullProcessImageNameW(
+            handle,
+            Default::default(),
+            PWSTR(buf.as_mut_ptr()),
+            &mut size,
+        );
         let _ = CloseHandle(handle);
         if ok.is_err() {
             return None;
@@ -256,7 +280,6 @@ mod windows_impl {
 
     pub fn apply_click_through_to_topmost() {
         unsafe {
-            // Best-effort: find our overlay window by title.
             let title: Vec<u16> = "Key Overlay HUD\0".encode_utf16().collect();
             let Ok(hwnd) = FindWindowW(None, windows::core::PCWSTR(title.as_ptr())) else {
                 return;
