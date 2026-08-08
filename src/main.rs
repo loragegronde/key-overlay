@@ -1,5 +1,9 @@
 //! Key Overlay — lightweight pure-Rust editor + transparent HUD.
 
+// Release Windows builds are a real GUI app (no console). Closing PowerShell
+// after a detached launch will not kill the process.
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+
 mod color;
 mod hud_control;
 mod input;
@@ -15,7 +19,7 @@ use std::time::Duration;
 
 use eframe::egui;
 
-use crate::input::{start_listener, InputMsg};
+use crate::input::{apply_egui_presses, start_listener, InputMsg};
 use crate::state::AppState;
 use crate::ui::editor::show_editor;
 use crate::ui::overlay::run_overlay;
@@ -80,10 +84,12 @@ impl eframe::App for EditorApp {
         while let Ok(msg) = self.input_rx.try_recv() {
             self.state.handle_input(msg);
         }
+        apply_egui_presses(ctx, &mut self.state);
         self.state.autosave_tick();
         poll_global_actions(ctx, &mut self.state);
         show_editor(ctx, &mut self.state);
-        ctx.request_repaint_after(Duration::from_millis(16));
+        let busy = !self.state.active_keys.is_empty() || self.state.capturing.is_some();
+        ctx.request_repaint_after(Duration::from_millis(if busy { 8 } else { 16 }));
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {

@@ -130,10 +130,10 @@ fn template_keys(id: LayoutTemplateId) -> Vec<KeyConfig> {
             circle("Mouseright", "RMB", 520.0, 190.0, 72.0, None),
         ],
         LayoutTemplateId::FightingArcade => vec![
-            key("ArrowUp", "▲", 80.0, 60.0, 56.0, 56.0),
-            key("ArrowLeft", "◀", 20.0, 120.0, 56.0, 56.0),
-            key("ArrowDown", "▼", 80.0, 120.0, 56.0, 56.0),
-            key("ArrowRight", "▶", 140.0, 120.0, 56.0, 56.0),
+            key("ArrowUp", "Up", 80.0, 60.0, 56.0, 56.0),
+            key("ArrowLeft", "Left", 20.0, 120.0, 56.0, 56.0),
+            key("ArrowDown", "Down", 80.0, 120.0, 56.0, 56.0),
+            key("ArrowRight", "Right", 140.0, 120.0, 56.0, 56.0),
             circle("KeyU", "LP", 280.0, 80.0, 64.0, Some("rgba(239,68,68,0.7)")),
             circle("KeyI", "MP", 360.0, 80.0, 64.0, Some("rgba(249,115,22,0.7)")),
             circle("KeyO", "HP", 440.0, 80.0, 64.0, Some("rgba(234,179,8,0.7)")),
@@ -223,10 +223,10 @@ fn template_keys(id: LayoutTemplateId) -> Vec<KeyConfig> {
             }
             keys.push(key("Space", "Space", 160.0, 260.0, 220.0, 48.0));
             if matches!(id, LayoutTemplateId::Tkl | LayoutTemplateId::Full100) {
-                keys.push(key("ArrowUp", "▲", 520.0, 200.0, 48.0, 48.0));
-                keys.push(key("ArrowLeft", "◀", 470.0, 250.0, 48.0, 48.0));
-                keys.push(key("ArrowDown", "▼", 520.0, 250.0, 48.0, 48.0));
-                keys.push(key("ArrowRight", "▶", 570.0, 250.0, 48.0, 48.0));
+                keys.push(key("ArrowUp", "Up", 520.0, 200.0, 48.0, 48.0));
+                keys.push(key("ArrowLeft", "Left", 470.0, 250.0, 48.0, 48.0));
+                keys.push(key("ArrowDown", "Down", 520.0, 250.0, 48.0, 48.0));
+                keys.push(key("ArrowRight", "Right", 570.0, 250.0, 48.0, 48.0));
             }
             if matches!(id, LayoutTemplateId::Full100) {
                 for i in 0..10 {

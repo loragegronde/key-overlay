@@ -1,6 +1,6 @@
 //! Shared key / stick painting for editor + overlay.
 
-use egui::{Align2, Color32, FontId, Pos2, Rect, Rounding, Sense, Stroke, Ui, Vec2};
+use egui::{Align2, Color32, FontId, Pos2, Rect, Rounding, Sense, Shape, Stroke, Ui, Vec2};
 
 use crate::color::{parse_color, pressed_fill};
 use crate::model::{KeyConfig, KeyShape, PressEffect};
@@ -80,6 +80,8 @@ pub fn paint_key(
 
     painter.rect(draw_rect, rounding, bg, Stroke::new(1.5_f32, border));
 
+    let text_color = parse_color(&key.style.text_color).to_egui();
+
     if key.shape == KeyShape::Stick {
         let (sx, sy) = state.stick_axes.get(&key.code).copied().unwrap_or((0.0, 0.0));
         let well = draw_rect.shrink(draw_rect.width() * 0.18);
@@ -106,18 +108,37 @@ pub fn paint_key(
             painter.text(
                 Pos2::new(draw_rect.center().x, draw_rect.bottom() - 10.0),
                 Align2::CENTER_CENTER,
-                if capturing { "…" } else { &key.label },
+                if capturing { "..." } else { &key.label },
                 FontId::monospace(10.0),
-                parse_color(&key.style.text_color).to_egui(),
+                text_color,
             );
         }
+    } else if capturing {
+        painter.text(
+            draw_rect.center(),
+            Align2::CENTER_CENTER,
+            "...",
+            FontId::proportional(key.style.font_size),
+            text_color,
+        );
+    } else if let Some(dir) = arrow_dir(key) {
+        // Draw arrows as shapes — egui default fonts lack ▲▼ (white squares).
+        paint_arrow(painter, draw_rect, dir, text_color);
+        if key.style.show_press_count {
+            if let Some(n) = state.press_counts.get(&key.code) {
+                if *n > 0 {
+                    painter.text(
+                        Pos2::new(draw_rect.center().x, draw_rect.bottom() - 8.0),
+                        Align2::CENTER_CENTER,
+                        format!("{n}"),
+                        FontId::monospace(10.0),
+                        text_color,
+                    );
+                }
+            }
+        }
     } else if key.style.show_label {
-        let base = if capturing {
-            "…"
-        } else {
-            display_label(key)
-        };
-        let mut label = base.to_string();
+        let mut label = display_label(key).to_string();
         if key.style.show_press_count {
             if let Some(n) = state.press_counts.get(&key.code) {
                 if *n > 0 {
@@ -125,51 +146,103 @@ pub fn paint_key(
                 }
             }
         }
-        // Proportional font: arrow / symbol labels render poorly in monospace.
-        let font = if is_symbol_label(base) {
-            FontId::proportional(key.style.font_size)
-        } else {
-            FontId::monospace(key.style.font_size)
-        };
         painter.text(
             draw_rect.center(),
             Align2::CENTER_CENTER,
             label,
-            font,
-            parse_color(&key.style.text_color).to_egui(),
+            FontId::monospace(key.style.font_size),
+            text_color,
         );
     }
 
     if selected {
-        painter.rect_stroke(rect.expand(2.0), rounding, Stroke::new(2.0_f32, Color32::from_rgb(34, 211, 238)));
+        painter.rect_stroke(
+            rect.expand(2.0),
+            rounding,
+            Stroke::new(2.0_f32, Color32::from_rgb(34, 211, 238)),
+        );
     }
     if capturing {
-        painter.rect_stroke(rect.expand(2.0), rounding, Stroke::new(2.0_f32, Color32::from_rgb(251, 191, 36)));
+        painter.rect_stroke(
+            rect.expand(2.0),
+            rounding,
+            Stroke::new(2.0_f32, Color32::from_rgb(251, 191, 36)),
+        );
     }
 
     response
 }
 
-/// Reliable labels for keys whose unicode arrows often missing from UI fonts.
-fn display_label(key: &KeyConfig) -> &str {
+#[derive(Clone, Copy)]
+enum ArrowDir {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+fn arrow_dir(key: &KeyConfig) -> Option<ArrowDir> {
     match key.code.as_str() {
-        "ArrowUp" => "▲",
-        "ArrowDown" => "▼",
-        "ArrowLeft" => "◀",
-        "ArrowRight" => "▶",
+        "ArrowUp" => Some(ArrowDir::Up),
+        "ArrowDown" => Some(ArrowDir::Down),
+        "ArrowLeft" => Some(ArrowDir::Left),
+        "ArrowRight" => Some(ArrowDir::Right),
         _ => match key.label.as_str() {
-            "↑" | "⬆" => "▲",
-            "↓" | "⬇" => "▼",
-            "←" | "⬅" => "◀",
-            "→" | "➡" => "▶",
-            _ => key.label.as_str(),
+            "↑" | "⬆" | "▲" | "Up" | "^" => Some(ArrowDir::Up),
+            "↓" | "⬇" | "▼" | "Down" | "v" | "V" => Some(ArrowDir::Down),
+            "←" | "⬅" | "◀" | "Left" | "<" => Some(ArrowDir::Left),
+            "→" | "➡" | "▶" | "Right" | ">" => Some(ArrowDir::Right),
+            _ => None,
         },
     }
 }
 
-fn is_symbol_label(label: &str) -> bool {
-    matches!(label, "▲" | "▼" | "◀" | "▶" | "…" | "↑" | "↓" | "←" | "→")
-        || label.chars().any(|c| !c.is_ascii_alphanumeric() && c != ' ')
+fn paint_arrow(painter: &egui::Painter, rect: Rect, dir: ArrowDir, color: Color32) {
+    let c = rect.center();
+    let s = rect.width().min(rect.height()) * 0.28;
+    let points = match dir {
+        ArrowDir::Up => vec![
+            Pos2::new(c.x, c.y - s),
+            Pos2::new(c.x - s, c.y + s * 0.7),
+            Pos2::new(c.x + s, c.y + s * 0.7),
+        ],
+        ArrowDir::Down => vec![
+            Pos2::new(c.x, c.y + s),
+            Pos2::new(c.x - s, c.y - s * 0.7),
+            Pos2::new(c.x + s, c.y - s * 0.7),
+        ],
+        ArrowDir::Left => vec![
+            Pos2::new(c.x - s, c.y),
+            Pos2::new(c.x + s * 0.7, c.y - s),
+            Pos2::new(c.x + s * 0.7, c.y + s),
+        ],
+        ArrowDir::Right => vec![
+            Pos2::new(c.x + s, c.y),
+            Pos2::new(c.x - s * 0.7, c.y - s),
+            Pos2::new(c.x - s * 0.7, c.y + s),
+        ],
+    };
+    painter.add(Shape::convex_polygon(points, color, Stroke::NONE));
+}
+
+/// ASCII-safe labels for text keys (avoid missing unicode glyphs).
+fn display_label(key: &KeyConfig) -> &str {
+    match key.code.as_str() {
+        "Enter" => "Ent",
+        "Backspace" => "Bksp",
+        "Escape" => "Esc",
+        "Delete" => "Del",
+        "ArrowUp" => "Up",
+        "ArrowDown" => "Dn",
+        "ArrowLeft" => "Lt",
+        "ArrowRight" => "Rt",
+        _ => match key.label.as_str() {
+            "↵" => "Ent",
+            "⌫" => "Bksp",
+            "…" => "...",
+            _ => key.label.as_str(),
+        },
+    }
 }
 
 pub fn paint_resize_handles(ui: &mut Ui, rect: Rect) {

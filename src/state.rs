@@ -29,6 +29,8 @@ pub struct AppState {
     pub dirty: bool,
     pub last_save: Instant,
     pub status: Option<(String, Instant)>,
+    /// Last key/mouse press shown in the editor ("typing preview").
+    pub last_pressed: Option<(String, Instant)>,
     pub overlay_open: bool,
     pub editor_request_focus: bool,
     pub canvas_size: egui::Vec2,
@@ -75,6 +77,7 @@ impl AppState {
             dirty: false,
             last_save: Instant::now(),
             status: None,
+            last_pressed: None,
             overlay_open: false,
             editor_request_focus: false,
             canvas_size: egui::vec2(800.0, 560.0),
@@ -208,7 +211,8 @@ impl AppState {
                             let keep = !key.label.is_empty()
                                 && key.label != "New Key"
                                 && key.label != key.code
-                                && key.label != "…";
+                                && key.label != "…"
+                                && key.label != "...";
                             key.code = code;
                             if !keep {
                                 key.label = if label == " " {
@@ -228,7 +232,13 @@ impl AppState {
                         return;
                     }
                     self.active_keys.insert(code.clone());
-                    *self.press_counts.entry(code).or_insert(0) += 1;
+                    *self.press_counts.entry(code.clone()).or_insert(0) += 1;
+                    let shown = if label.trim().is_empty() {
+                        code.clone()
+                    } else {
+                        label.clone()
+                    };
+                    self.last_pressed = Some((shown, Instant::now()));
                 } else {
                     self.active_keys.remove(&code);
                 }
@@ -552,7 +562,7 @@ impl AppState {
         // Secondary egui viewports can't be transparent on Windows (black window).
         // Spawn the HUD as its own process so it owns a transparent root window.
         match std::env::current_exe() {
-            Ok(exe) => match std::process::Command::new(exe).arg("--overlay").spawn() {
+            Ok(exe) => match spawn_overlay_process(&exe) {
                 Ok(_) => {
                     self.overlay_open = true;
                     self.flash("Overlay launched — drag it, then Ctrl+Shift+L to lock/unlock");
@@ -581,4 +591,21 @@ impl AppState {
             PressEffect::None => "None",
         }
     }
+}
+
+fn spawn_overlay_process(exe: &std::path::Path) -> std::io::Result<std::process::Child> {
+    let mut cmd = std::process::Command::new(exe);
+    cmd.arg("--overlay");
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // Survive the parent console/job closing (real detached app process).
+        const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
+        const DETACHED_PROCESS: u32 = 0x00000008;
+        const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x01000000;
+        cmd.creation_flags(
+            CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS | CREATE_BREAKAWAY_FROM_JOB,
+        );
+    }
+    cmd.spawn()
 }

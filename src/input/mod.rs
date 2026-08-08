@@ -3,7 +3,7 @@
 mod egui_bind;
 mod mapping;
 
-pub use egui_bind::capture_from_egui;
+pub use egui_bind::{apply_egui_presses, capture_from_egui};
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};

@@ -15,7 +15,7 @@ use std::time::{Duration, Instant, SystemTime};
 use eframe::egui::{self, Align2, CentralPanel, Color32, FontId, Frame, Pos2, Sense, Vec2};
 
 use crate::hud_control::{self, HudControl};
-use crate::input::{start_listener, InputMsg};
+use crate::input::{apply_egui_presses, start_listener, InputMsg};
 use crate::model::{KeyConfig, HOTKEY_TOGGLE_LOCK};
 use crate::persist::{self, load_library};
 use crate::platform;
@@ -137,6 +137,10 @@ impl eframe::App for OverlayApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         while let Ok(msg) = self.input_rx.try_recv() {
             self.state.handle_input(msg);
+        }
+        // When the HUD still has focus (unlocked), light keys from egui too.
+        if !self.control.locked {
+            apply_egui_presses(ctx, &mut self.state);
         }
 
         // Local fallback when this window still has focus (global hotkeys also

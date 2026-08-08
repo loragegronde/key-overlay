@@ -32,6 +32,10 @@ Pure **Rust** desktop app (`eframe` / `egui`) — single native binary, no web s
 .\dev.ps1 -Release -Run
 ```
 
+`dev.ps1 -Run` starts the app **detached** (a real Windows GUI process). Closing PowerShell will not quit Key Overlay. Use `-Foreground` only if you want it tied to the terminal.
+
+You can also double-click `target\release\key-overlay.exe`.
+
 `dev.ps1` loads the MSVC toolchain (`vcvars64`) before calling Cargo.
 
 ### Linux / macOS

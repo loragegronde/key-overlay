@@ -87,6 +87,29 @@ fn toolbar(ui: &mut Ui, state: &mut AppState) {
         state.place_overlay();
     }
 
+    ui.add_space(4.0);
+    if let Some((label, at)) = state.last_pressed.as_ref() {
+        if at.elapsed() < std::time::Duration::from_secs(2) {
+            ui.label(
+                RichText::new(format!("Last key: {label}"))
+                    .monospace()
+                    .color(Color32::from_rgb(34, 211, 238)),
+            );
+        } else {
+            ui.label(
+                RichText::new("Last key: —")
+                    .small()
+                    .color(Color32::DARK_GRAY),
+            );
+        }
+    } else {
+        ui.label(
+            RichText::new("Type to preview keys on the canvas")
+                .small()
+                .color(Color32::DARK_GRAY),
+        );
+    }
+
     ui.separator();
     if ui.button("Add Custom Key").clicked() {
         state.add_key();

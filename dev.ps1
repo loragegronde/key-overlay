@@ -1,7 +1,9 @@
 # Load MSVC environment (required on Windows for native crates) and build/run.
 param(
     [switch]$Release,
-    [switch]$Run
+    [switch]$Run,
+    # Keep the process attached to this console (closes when the shell closes).
+    [switch]$Foreground
 )
 
 $ErrorActionPreference = "Stop"
@@ -25,17 +27,32 @@ if ($IsWindows -or $env:OS -match "Windows") {
     [void](Import-VcVars)
 }
 
-$args = @("build")
-if ($Release) { $args += "--release" }
+$buildArgs = @("build")
+if ($Release) { $buildArgs += "--release" }
 
-Write-Host "cargo $($args -join ' ')"
-cargo @args
+Write-Host "cargo $($buildArgs -join ' ')"
+cargo @buildArgs
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 if ($Run) {
-    if ($Release) {
-        cargo run --release
+    $exe = if ($Release) {
+        Join-Path $PSScriptRoot "target\release\key-overlay.exe"
     } else {
-        cargo run
+        Join-Path $PSScriptRoot "target\debug\key-overlay.exe"
     }
+    if (-not (Test-Path $exe)) {
+        Write-Error "Built executable not found: $exe"
+        exit 1
+    }
+
+    if ($Foreground) {
+        Write-Host "Running in foreground: $exe"
+        & $exe
+        exit $LASTEXITCODE
+    }
+
+    # Detached GUI process — closing this PowerShell window will not kill the app.
+    Write-Host "Starting Key Overlay (detached): $exe"
+    Start-Process -FilePath $exe -WorkingDirectory $PSScriptRoot
+    Write-Host "App is running independently. You can close this terminal."
 }

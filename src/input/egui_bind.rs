@@ -5,6 +5,68 @@ use egui::{Event, Key, PointerButton};
 use crate::input::{InputAction, InputMsg};
 use crate::state::AppState;
 
+/// Mirror focused-window key/mouse presses into `active_keys` so the editor
+/// canvas lights up while you type (rdev still covers global/game input).
+pub fn apply_egui_presses(ctx: &egui::Context, state: &mut AppState) {
+    if state.capturing.is_some() {
+        return;
+    }
+
+    let mut msgs = Vec::new();
+    ctx.input(|i| {
+        for ev in &i.events {
+            match ev {
+                Event::Key {
+                    key,
+                    pressed,
+                    repeat,
+                    ..
+                } if !*repeat => {
+                    if let Some((code, label)) = map_egui_key(*key) {
+                        msgs.push(InputMsg::Key {
+                            code,
+                            label,
+                            action: if *pressed {
+                                InputAction::Down
+                            } else {
+                                InputAction::Up
+                            },
+                        });
+                    }
+                }
+                Event::PointerButton {
+                    button,
+                    pressed,
+                    ..
+                } => {
+                    let mapped = match button {
+                        PointerButton::Primary => Some(("Mouseleft", "LMB")),
+                        PointerButton::Secondary => Some(("Mouseright", "RMB")),
+                        PointerButton::Middle => Some(("Mousemiddle", "MMB")),
+                        _ => None,
+                    };
+                    if let Some((code, label)) = mapped {
+                        msgs.push(InputMsg::Key {
+                            code: code.into(),
+                            label: label.into(),
+                            action: if *pressed {
+                                InputAction::Down
+                            } else {
+                                InputAction::Up
+                            },
+                        });
+                    }
+                }
+                _ => {}
+            }
+        }
+    });
+
+    for msg in msgs {
+        state.handle_input(msg);
+    }
+}
+
 /// While rebinding, consume egui key/mouse-down events into a binding.
 pub fn capture_from_egui(ctx: &egui::Context, state: &mut AppState) {
     if state.capturing.is_none() || state.bind_suppressed() {
@@ -98,14 +160,14 @@ fn map_egui_key(key: Key) -> Option<(String, String)> {
         Key::Num8 => ("Digit8", "8"),
         Key::Num9 => ("Digit9", "9"),
         Key::Space => ("Space", "Space"),
-        Key::Enter => ("Enter", "↵"),
+        Key::Enter => ("Enter", "Ent"),
         Key::Tab => ("Tab", "Tab"),
-        Key::Backspace => ("Backspace", "⌫"),
+        Key::Backspace => ("Backspace", "Bksp"),
         Key::Delete => ("Delete", "Del"),
-        Key::ArrowUp => ("ArrowUp", "▲"),
-        Key::ArrowDown => ("ArrowDown", "▼"),
-        Key::ArrowLeft => ("ArrowLeft", "◀"),
-        Key::ArrowRight => ("ArrowRight", "▶"),
+        Key::ArrowUp => ("ArrowUp", "Up"),
+        Key::ArrowDown => ("ArrowDown", "Dn"),
+        Key::ArrowLeft => ("ArrowLeft", "Lt"),
+        Key::ArrowRight => ("ArrowRight", "Rt"),
         Key::Home => ("Home", "Home"),
         Key::End => ("End", "End"),
         Key::PageUp => ("PageUp", "PgUp"),
