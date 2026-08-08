@@ -516,29 +516,67 @@ fn settings_tab(ui: &mut Ui, state: &mut AppState) {
 
     ui.separator();
     ui.label(RichText::new("Target app filter").strong());
+    ui.label(
+        RichText::new("HUD shows only when the focused app matches (process name or window title).")
+            .small()
+            .color(Color32::DARK_GRAY),
+    );
+
+    let external = platform::last_external_app();
+    let live = platform::get_foreground_app().unwrap_or_default();
+    let live_label = if live.is_own_app() {
+        if external.process_name.is_empty() && external.window_title.is_empty() {
+            "Focus your game/app once, then click Capture".into()
+        } else {
+            format!("Last app: {}", external.display())
+        }
+    } else {
+        format!("Focused: {}", live.display())
+    };
+    ui.label(
+        RichText::new(live_label)
+            .small()
+            .color(Color32::from_rgb(34, 211, 238)),
+    );
+
     let mut enabled = state.profile().target_app_enabled;
     if ui.checkbox(&mut enabled, "Only show while app matches").changed() {
         state.profile_mut().target_app_enabled = enabled;
         platform::set_filter(enabled, state.profile().target_app_match.clone());
         state.dirty = true;
+        state.flush_save();
     }
-    let mut match_text = state.profile().target_app_match.clone();
-    if ui.text_edit_singleline(&mut match_text).changed() {
-        state.profile_mut().target_app_match = match_text.clone();
-        platform::set_filter(state.profile().target_app_enabled, match_text);
-        state.dirty = true;
-    }
-    if ui.button("Use currently focused app").clicked() {
-        if let Ok(fg) = platform::get_foreground_app() {
-            let name = if fg.process_name.is_empty() {
-                fg.window_title
-            } else {
+    ui.horizontal(|ui| {
+        ui.label("Match:");
+        let mut match_text = state.profile().target_app_match.clone();
+        if ui
+            .add(TextEdit::singleline(&mut match_text).desired_width(180.0).hint_text("e.g. notepad or Discord"))
+            .changed()
+        {
+            state.profile_mut().target_app_match = match_text.clone();
+            platform::set_filter(state.profile().target_app_enabled, match_text);
+            state.dirty = true;
+            state.flush_save();
+        }
+    });
+    if ui.button("Capture last focused app").clicked() {
+        let fg = platform::last_external_app();
+        if fg.is_own_app()
+            || (fg.process_name.is_empty() && fg.window_title.is_empty())
+        {
+            state.flash("Focus your game/app first, then click Capture");
+        } else {
+            let name = if !fg.process_name.is_empty() {
                 fg.process_name
+            } else {
+                fg.window_title
             };
             state.profile_mut().target_app_match = name.clone();
             state.profile_mut().target_app_enabled = true;
-            platform::set_filter(true, name);
+            platform::set_filter(true, name.clone());
             state.dirty = true;
+            state.flush_save();
+            state.flash(format!("Filter set to \"{name}\""));
         }
     }
 

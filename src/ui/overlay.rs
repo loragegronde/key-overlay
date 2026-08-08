@@ -169,10 +169,12 @@ impl eframe::App for OverlayApp {
         self.sync_layout();
         self.sync_window_size(ctx);
 
+        // Unlocked (positioning): always show so you can place the HUD.
+        // Locked: honor target-app filter + manual visibility.
         let positioning = !self.control.locked;
-        let show = (platform::SHOULD_SHOW_OVERLAY.load(std::sync::atomic::Ordering::SeqCst)
-            || positioning)
-            && self.control.visible;
+        let filtered =
+            platform::SHOULD_SHOW_OVERLAY.load(std::sync::atomic::Ordering::SeqCst);
+        let show = self.control.visible && (positioning || filtered);
 
         if self.last_show != Some(show) {
             ctx.send_viewport_cmd(egui::ViewportCommand::Visible(show));
