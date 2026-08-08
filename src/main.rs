@@ -17,41 +17,43 @@ use eframe::egui;
 use crate::input::{start_listener, InputMsg};
 use crate::state::AppState;
 use crate::ui::editor::show_editor;
-use crate::ui::overlay::show_overlay;
+use crate::ui::overlay::run_overlay;
 
 fn main() -> eframe::Result<()> {
-    env_logger_stub();
+    if std::env::args().any(|a| a == "--overlay") {
+        return run_overlay();
+    }
+    run_editor()
+}
 
+fn run_editor() -> eframe::Result<()> {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_title("Key Overlay")
             .with_inner_size([1180.0, 740.0])
             .with_min_inner_size([900.0, 560.0]),
+        // glow: required for transparent HUD process; editor stays opaque.
+        renderer: eframe::Renderer::Glow,
+        centered: true,
         ..Default::default()
     };
 
     eframe::run_native(
         "Key Overlay",
         options,
-        Box::new(|cc| Ok(Box::<KeyOverlayApp>::new(KeyOverlayApp::new(cc)))),
+        Box::new(|cc| Ok(Box::<EditorApp>::new(EditorApp::new(cc)))),
     )
 }
 
-fn env_logger_stub() {
-    // Intentionally empty — keep binary lean; eprintln! used for diagnostics.
-}
-
-struct KeyOverlayApp {
+struct EditorApp {
     state: AppState,
     input_rx: Receiver<InputMsg>,
-    last_native_flags: Instant,
     #[cfg(windows)]
     _hotkeys: Option<WindowsShell>,
 }
 
-impl KeyOverlayApp {
-    fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        egui_extras_install(cc);
+impl EditorApp {
+    fn new(_cc: &eframe::CreationContext<'_>) -> Self {
         platform::start_watcher();
         let input_rx = start_listener();
         let state = AppState::load();
@@ -62,56 +64,30 @@ impl KeyOverlayApp {
 
         #[cfg(windows)]
         let _hotkeys = WindowsShell::start();
-        #[cfg(not(windows))]
-        let _hotkeys = ();
 
         Self {
             state,
             input_rx,
-            last_native_flags: Instant::now(),
             #[cfg(windows)]
             _hotkeys,
         }
     }
 }
 
-fn egui_extras_install(_cc: &eframe::CreationContext<'_>) {}
-
-impl eframe::App for KeyOverlayApp {
+impl eframe::App for EditorApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         while let Ok(msg) = self.input_rx.try_recv() {
             self.state.handle_input(msg);
         }
         self.state.tick_kps();
         self.state.autosave_tick();
-
-        // Soft-poll hotkey / visibility intents from platform shell.
         poll_global_actions(ctx, &mut self.state);
-
         show_editor(ctx, &mut self.state);
-
-        if self.state.overlay_open
-            || platform::SHOULD_SHOW_OVERLAY.load(std::sync::atomic::Ordering::SeqCst)
-            || platform::is_positioning()
-        {
-            show_overlay(ctx, &mut self.state);
-        }
-
-        if self.last_native_flags.elapsed() > Duration::from_millis(200) {
-            platform::apply_native_window_flags("Key Overlay HUD");
-            self.last_native_flags = Instant::now();
-        }
-
-        // Continuous repaint while keys may be held / sticks move.
         ctx.request_repaint_after(Duration::from_millis(16));
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
         self.state.flush_save();
-    }
-
-    fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
-        egui::Rgba::TRANSPARENT.to_array()
     }
 }
 
@@ -134,7 +110,6 @@ fn poll_global_actions(ctx: &egui::Context, state: &mut AppState) {
         }
     }
 
-    // Editor-focused fallbacks (also cover Linux/macOS where global-hotkey isn't wired).
     ctx.input(|i| {
         let chord = i.modifiers.ctrl && i.modifiers.shift;
         if chord && i.key_pressed(egui::Key::O) {
@@ -142,6 +117,7 @@ fn poll_global_actions(ctx: &egui::Context, state: &mut AppState) {
         }
         if chord && i.key_pressed(egui::Key::L) {
             platform::finish_positioning();
+            state.flash("Overlay locked (click-through)");
         }
         if chord && i.key_pressed(egui::Key::E) {
             state.editor_request_focus = true;
@@ -151,7 +127,6 @@ fn poll_global_actions(ctx: &egui::Context, state: &mut AppState) {
     if state.editor_request_focus {
         state.editor_request_focus = false;
         ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
-        ctx.send_viewport_cmd(egui::ViewportCommand::Maximized(false));
     }
 }
 
@@ -164,7 +139,6 @@ enum ShellAction {
 
 #[cfg(windows)]
 struct WindowsShell {
-    // Keep manager alive.
     _mgr: global_hotkey::GlobalHotKeyManager,
 }
 
@@ -182,24 +156,20 @@ impl WindowsShell {
         mgr.register(l).ok()?;
         mgr.register(e).ok()?;
 
-        // Store codes for matching in poll via thread-local / once_cell.
         HOTKEY_IDS.lock().replace(HotkeyIds {
             toggle: o.id(),
             lock: l.id(),
             editor: e.id(),
         });
 
-        // Drain receiver in poll using GlobalHotKeyEvent::receiver
         let _ = GlobalHotKeyEvent::receiver();
         let _ = HotKeyState::Pressed;
 
-        // Tray icon (best-effort).
         if let Ok(icon) = load_tray_icon() {
-            let tray = tray_icon::TrayIconBuilder::new()
+            let _ = tray_icon::TrayIconBuilder::new()
                 .with_tooltip("Key Overlay")
                 .with_icon(icon)
                 .build();
-            let _ = tray;
         }
 
         Some(Self { _mgr: mgr })
@@ -241,7 +211,6 @@ static HOTKEY_IDS: once_cell::sync::Lazy<parking_lot::Mutex<Option<HotkeyIds>>> 
 
 #[cfg(windows)]
 fn load_tray_icon() -> Result<tray_icon::Icon, ()> {
-    // 32x32 cyan square fallback.
     let size = 32;
     let mut rgba = vec![0u8; size * size * 4];
     for px in rgba.chunks_exact_mut(4) {

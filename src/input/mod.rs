@@ -1,6 +1,9 @@
 //! Global keyboard/mouse (rdev) + gamepad (gilrs) capture.
 
+mod egui_bind;
 mod mapping;
+
+pub use egui_bind::capture_from_egui;
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -49,14 +52,17 @@ pub fn start_listener() -> Receiver<InputMsg> {
         thread::Builder::new()
             .name("rdev-input".into())
             .spawn(move || {
-                let _ = rdev::listen(move |event| {
+                if let Err(err) = rdev::listen(move |event| {
                     if !FORWARDING.load(Ordering::Relaxed) {
                         return;
                     }
                     if let Some(msg) = translate_rdev(event) {
                         let _ = tx_keys.send(msg);
                     }
-                });
+                }) {
+                    eprintln!("rdev keyboard/mouse listener failed: {err:?}");
+                    eprintln!("rebind will still work via the egui fallback while the editor is focused");
+                }
             })
             .ok();
 
@@ -107,6 +113,7 @@ fn gamepad_loop(tx: Sender<InputMsg>) {
     let mut prev_buttons: HashMap<(usize, String), bool> = HashMap::new();
     let mut prev_dirs: HashMap<(usize, String), bool> = HashMap::new();
     let mut prev_stick: HashMap<(usize, String), bool> = HashMap::new();
+    let mut prev_axes: HashMap<String, (f32, f32)> = HashMap::new();
 
     loop {
         while let Some(_ev) = gilrs.next_event() {}
@@ -136,16 +143,17 @@ fn gamepad_loop(tx: Sender<InputMsg>) {
             let ly = -gamepad.value(Axis::LeftStickY);
             let rx = gamepad.value(Axis::RightStickX);
             let ry = -gamepad.value(Axis::RightStickY);
-            let _ = tx.send(InputMsg::StickAxes {
-                code: "PadLS".into(),
-                x: lx,
-                y: ly,
-            });
-            let _ = tx.send(InputMsg::StickAxes {
-                code: "PadRS".into(),
-                x: rx,
-                y: ry,
-            });
+            for (code, x, y) in [("PadLS", lx, ly), ("PadRS", rx, ry)] {
+                let prev = prev_axes.get(code).copied().unwrap_or((0.0, 0.0));
+                if (prev.0 - x).abs() > 0.02 || (prev.1 - y).abs() > 0.02 {
+                    let _ = tx.send(InputMsg::StickAxes {
+                        code: code.into(),
+                        x,
+                        y,
+                    });
+                    prev_axes.insert(code.into(), (x, y));
+                }
+            }
 
             for (code, x, y, label) in [
                 ("PadLS", lx, ly, "LS"),

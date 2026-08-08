@@ -268,7 +268,7 @@ fn visuals_tab(ui: &mut Ui, state: &mut AppState) {
         ui.horizontal(|ui| {
             ui.monospace(&reference.code);
             let capturing = state.capturing.as_deref() == Some(id.as_str());
-            if ui
+                if ui
                 .button(if capturing { "Press…" } else { "Rebind" })
                 .clicked()
             {
@@ -276,6 +276,8 @@ fn visuals_tab(ui: &mut Ui, state: &mut AppState) {
                     state.capturing = None;
                 } else {
                     state.capturing = Some(id);
+                    state.suppress_shortcuts_until =
+                        std::time::Instant::now() + std::time::Duration::from_millis(300);
                 }
             }
         });
@@ -796,6 +798,9 @@ fn handle_editor_shortcuts(ctx: &Context, state: &mut AppState) {
             }
         }
     });
+
+    // Prefer egui events for rebind — reliable while the editor is focused.
+    crate::input::capture_from_egui(ctx, state);
 
     if state.shortcuts_blocked() {
         return;

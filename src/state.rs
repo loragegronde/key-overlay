@@ -86,6 +86,15 @@ impl AppState {
         }
     }
 
+    pub fn set_library(&mut self, library: LayoutLibrary) {
+        self.library = library;
+        if !self.library.profiles.iter().any(|p| p.id == self.library.active_id) {
+            if let Some(first) = self.library.profiles.first() {
+                self.library.active_id = first.id.clone();
+            }
+        }
+    }
+
     pub fn profile(&self) -> &ProfileConfig {
         self.library
             .profiles
@@ -196,6 +205,9 @@ impl AppState {
             } => {
                 if action == InputAction::Down {
                     if let Some(id) = self.capturing.clone() {
+                        if self.bind_suppressed() {
+                            return;
+                        }
                         self.push_history();
                         if let Some(key) = self.profile_mut().keys.iter_mut().find(|k| k.id == id) {
                             let keep = !key.label.is_empty()
@@ -387,6 +399,7 @@ impl AppState {
         self.profile_mut().keys.push(key);
         self.selected = HashSet::from([id.clone()]);
         self.capturing = Some(id);
+        self.suppress_shortcuts_until = Instant::now() + Duration::from_millis(300);
         self.touch();
     }
 
@@ -554,12 +567,28 @@ impl AppState {
             self.profile().target_app_enabled,
             self.profile().target_app_match.clone(),
         );
-        self.overlay_open = true;
-        self.flash("Overlay ready — drag it, then Ctrl+Shift+L to lock");
+
+        // Secondary egui viewports can't be transparent on Windows (black window).
+        // Spawn the HUD as its own process so it owns a transparent root window.
+        match std::env::current_exe() {
+            Ok(exe) => match std::process::Command::new(exe).arg("--overlay").spawn() {
+                Ok(_) => {
+                    self.overlay_open = true;
+                    self.flash("Overlay launched — drag it, then Ctrl+Shift+L to lock");
+                }
+                Err(err) => self.flash(format!("could not launch overlay: {err}")),
+            },
+            Err(err) => self.flash(format!("could not find executable: {err}")),
+        }
     }
 
     pub fn shortcuts_blocked(&self) -> bool {
-        self.capturing.is_some() || Instant::now() < self.suppress_shortcuts_until
+        self.capturing.is_some() || self.bind_suppressed()
+    }
+
+    /// True briefly after starting a rebind so the opening click isn't assigned.
+    pub fn bind_suppressed(&self) -> bool {
+        Instant::now() < self.suppress_shortcuts_until
     }
 
     pub fn effect_label(effect: PressEffect) -> &'static str {

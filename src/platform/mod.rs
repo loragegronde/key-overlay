@@ -68,7 +68,6 @@ pub fn set_click_through(enabled: bool) {
     CLICK_THROUGH.store(enabled, Ordering::SeqCst);
 }
 
-#[allow(dead_code)]
 pub fn is_click_through() -> bool {
     CLICK_THROUGH.load(Ordering::SeqCst)
 }
