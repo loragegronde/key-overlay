@@ -53,6 +53,8 @@ fn run_editor() -> eframe::Result<()> {
 struct EditorApp {
     state: AppState,
     input_rx: Receiver<InputMsg>,
+    /// Last value written to hud-control `suppress_input`.
+    suppress_input: bool,
     #[cfg(windows)]
     _hotkeys: Option<WindowsShell>,
 }
@@ -66,6 +68,7 @@ impl EditorApp {
             state.profile().target_app_enabled,
             state.profile().target_app_match.clone(),
         );
+        hud_control::set_suppress_input(false);
 
         #[cfg(windows)]
         let _hotkeys = WindowsShell::start();
@@ -73,6 +76,7 @@ impl EditorApp {
         Self {
             state,
             input_rx,
+            suppress_input: false,
             #[cfg(windows)]
             _hotkeys,
         }
@@ -81,10 +85,28 @@ impl EditorApp {
 
 impl eframe::App for EditorApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        while let Ok(msg) = self.input_rx.try_recv() {
-            self.state.handle_input(msg);
+        // Text fields (key name, settings, …) own the keyboard — don't drive
+        // canvas/HUD highlights or delete/nudge shortcuts while typing.
+        let typing = ctx.wants_keyboard_input();
+        if typing != self.suppress_input {
+            hud_control::set_suppress_input(typing);
+            self.suppress_input = typing;
         }
-        apply_egui_presses(ctx, &mut self.state);
+
+        while let Ok(msg) = self.input_rx.try_recv() {
+            if typing {
+                if let InputMsg::StickAxes { .. } = msg {
+                    self.state.handle_input(msg);
+                }
+            } else {
+                self.state.handle_input(msg);
+            }
+        }
+        if typing {
+            self.state.active_keys.clear();
+        } else {
+            apply_egui_presses(ctx, &mut self.state);
+        }
         self.state.autosave_tick();
         poll_global_actions(ctx, &mut self.state);
         show_editor(ctx, &mut self.state);
@@ -93,6 +115,7 @@ impl eframe::App for EditorApp {
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        hud_control::set_suppress_input(false);
         self.state.flush_save();
     }
 }

@@ -17,6 +17,9 @@ use crate::persist::layout_path;
 pub struct HudControl {
     pub locked: bool,
     pub visible: bool,
+    /// When true, HUD ignores key highlights (editor text field has focus).
+    #[serde(default)]
+    pub suppress_input: bool,
     /// Bumped on every write so consumers notice rapid toggles even if mtime stalls.
     #[serde(default)]
     pub rev: u64,
@@ -27,6 +30,7 @@ impl Default for HudControl {
         Self {
             locked: false,
             visible: true,
+            suppress_input: false,
             rev: 0,
         }
     }
@@ -67,6 +71,18 @@ pub fn reset_for_place() {
     let mut c = load();
     c.locked = false;
     c.visible = true;
+    c.suppress_input = false;
+    c.rev = c.rev.wrapping_add(1);
+    let _ = save(&c);
+}
+
+/// Pause HUD key highlighting while the editor is typing in a text field.
+pub fn set_suppress_input(suppress: bool) {
+    let mut c = load();
+    if c.suppress_input == suppress {
+        return;
+    }
+    c.suppress_input = suppress;
     c.rev = c.rev.wrapping_add(1);
     let _ = save(&c);
 }

@@ -94,6 +94,7 @@ impl OverlayApp {
         if next.rev != self.control.rev
             || next.locked != self.control.locked
             || next.visible != self.control.visible
+            || next.suppress_input != self.control.suppress_input
         {
             self.control = next;
             apply_control_to_platform(&self.control);
@@ -136,10 +137,19 @@ impl eframe::App for OverlayApp {
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         while let Ok(msg) = self.input_rx.try_recv() {
-            self.state.handle_input(msg);
+            if self.control.suppress_input {
+                // Editor is typing in a text field — don't flash HUD keys.
+                if let InputMsg::StickAxes { .. } = msg {
+                    self.state.handle_input(msg);
+                }
+            } else {
+                self.state.handle_input(msg);
+            }
         }
-        // When the HUD still has focus (unlocked), light keys from egui too.
-        if !self.control.locked {
+        if self.control.suppress_input {
+            self.state.active_keys.clear();
+        } else if !self.control.locked {
+            // When the HUD still has focus (unlocked), light keys from egui too.
             apply_egui_presses(ctx, &mut self.state);
         }
 

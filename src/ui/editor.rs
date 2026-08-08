@@ -814,6 +814,15 @@ fn canvas(ui: &mut Ui, state: &mut AppState) {
 }
 
 fn handle_editor_shortcuts(ctx: &Context, state: &mut AppState) {
+    // Prefer egui events for rebind — reliable while the editor is focused.
+    crate::input::capture_from_egui(ctx, state);
+
+    // While a TextEdit (key label, filter, …) has focus, arrows/backspace/delete
+    // must edit the text — not nudge or remove layout keys.
+    if ctx.wants_keyboard_input() {
+        return;
+    }
+
     ctx.input(|i| {
         if i.key_pressed(egui::Key::Escape) {
             if state.capturing.is_some() {
@@ -823,9 +832,6 @@ fn handle_editor_shortcuts(ctx: &Context, state: &mut AppState) {
             }
         }
     });
-
-    // Prefer egui events for rebind — reliable while the editor is focused.
-    crate::input::capture_from_egui(ctx, state);
 
     if state.shortcuts_blocked() {
         return;
